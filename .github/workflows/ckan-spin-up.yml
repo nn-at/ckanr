@@ -18,3 +18,7 @@ jobs:
           cp .env.example .env
           docker-compose build
           docker-compose up -d
+
+      - name: Check if CKAN is up
+        run: |
+          curl --retry 5 --retry-delay 1  localhost:5000/api/3
