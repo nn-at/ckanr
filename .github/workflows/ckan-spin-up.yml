@@ -15,5 +15,6 @@ jobs:
       - name: Spin up ckan
         run: |
           cd docker-ckan
+          cp .env.example .env
           docker-compose build
           docker-compose up -d
