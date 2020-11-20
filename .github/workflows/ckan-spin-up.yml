@@ -5,15 +5,8 @@ name: ckan-spin-up
 jobs:
   ckan-spin-up:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
       - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y curl git ruby-faraday ruby-json ruby-octokit
       - name: Clone ckan docker repo
         run: |
           git config --global user.email "myrmecocystus@gmail.com"
