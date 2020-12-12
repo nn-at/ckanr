@@ -26,10 +26,27 @@ through file URL.}
 
 \item{key}{A CKAN API key (optional, character)}
 
-\item{...}{Curl arguments passed on to \link[crul:verb-GET]{crul::verb-GET}}
+\item{...}{Arguments passed on to the function used to read the file, if \code{store="session"}. See details.}
 }
 \description{
 Download a file
+}
+\details{
+The \code{...} argument can be used to pass additional arguments to the
+function that actually reads the file. It is only used when \code{store="session"}
+and if the file is \emph{not} a ZIP file.
+
+This list shows what function is used to read what file format, so that you can
+see what additional arguments are available:
+\itemize{
+\item csv: \link[utils]{read.csv}
+\item xls, xlsx: \link[readxl]{read_excel}
+\item xml: \link[xml2]{read_xml}
+\item html: \link[xml2]{read_html}
+\item json: \link[jsonlite]{fromJSON}
+\item shp, geojson: \link[sf]{st_read}
+\item txt: \link[utils]{read.table}
+}
 }
 \examples{
 \dontrun{
@@ -105,5 +122,19 @@ as = "table")
 x <- ckan_fetch(res$url)
 names(x)
 head(x[["ChickenpoxAgegroups2017.csv"]])
+
+# TXT file
+ckanr_setup("https://ckan0.cf.opendata.inter.prod-toronto.ca")
+res <- resource_show(id = "e4211f49-611f-438c-a444-aaa7f3f84117",
+as = "table")
+x <- ckan_fetch(res$url)
+head(x)
+
+# TXT file, semicolon used as separator
+ckanr_setup("https://data.coat.no")
+res <- resource_show(id = "384fe537-e0bd-4e57-8a0d-420b7a745196",
+as = "table")
+x <- ckan_fetch(res$url, sep = ";")
+head(x)
 }
 }

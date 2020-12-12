@@ -1,6 +1,21 @@
 #' Download a file
 #'
 #' @export
+#' 
+#' @details The `...` argument can be used to pass additional arguments to the 
+#' function that actually reads the file. It is only used when `store="session"`
+#'  and if the file is *not* a ZIP file. 
+#' 
+#' This list shows what function is used to read what file format, so that you can
+#' see what additional arguments are available:
+#' * csv: \link[utils]{read.csv}
+#' * xls, xlsx: \link[readxl]{read_excel}
+#' * xml: \link[xml2]{read_xml}
+#' * html: \link[xml2]{read_html}
+#' * json: \link[jsonlite]{fromJSON}
+#' * shp, geojson: \link[sf]{st_read}
+#' * txt: \link[utils]{read.table}
+#' 
 #'
 #' @param x URL for the file
 #' @param store One of session (default) or disk. session stores in R session,
@@ -9,7 +24,7 @@
 #' @param format Format of the file. Required if format is not detectable
 #' through file URL.
 #' @param key A CKAN API key (optional, character)
-#' @param ... Curl arguments passed on to [crul::verb-GET]
+#' @param ... Arguments passed on to the function used to read the file, if `store="session"`. See details.
 #' @examples \dontrun{
 #' # CSV file
 #' ckanr_setup("http://datamx.io")
@@ -83,6 +98,20 @@
 #' x <- ckan_fetch(res$url)
 #' names(x)
 #' head(x[["ChickenpoxAgegroups2017.csv"]])
+#' 
+#' # TXT file
+#' ckanr_setup("https://ckan0.cf.opendata.inter.prod-toronto.ca")
+#' res <- resource_show(id = "e4211f49-611f-438c-a444-aaa7f3f84117",
+#' as = "table")
+#' x <- ckan_fetch(res$url)
+#' head(x)
+#' 
+#' # TXT file, semicolon used as separator
+#' ckanr_setup("https://data.coat.no")
+#' res <- resource_show(id = "384fe537-e0bd-4e57-8a0d-420b7a745196",
+#' as = "table")
+#' x <- ckan_fetch(res$url, sep = ";")
+#' head(x)
 #' }
 ckan_fetch <- function(x, store = "session", path = "file", format = NULL,
   key = get_default_key(), ...) {
@@ -94,11 +123,11 @@ ckan_fetch <- function(x, store = "session", path = "file", format = NULL,
   store <- match.arg(store, c("session", "disk"))
   derived_file_fmt <- file_fmt(x)
   if (is.na(derived_file_fmt) && is.null(format)) {
-    stop("File format is not available from URL; please specify via `format` argument.")
+    stop("File format is not available from URL; please specify via `format` argument.", call. = FALSE)
   }
   fmt <- ifelse(is.na(derived_file_fmt), format, derived_file_fmt)
   fmt <- tolower(fmt)
-  res <- fetch_GET(x, store, path, format = fmt, key = key, ...)
+  res <- fetch_GET(x, store, path, format = fmt, key = key)
   if (store == "session") {
     if (res$fmt == "zip") {
       temp_res <- vector(mode = "list", length = length(res$path))
@@ -110,7 +139,7 @@ ckan_fetch <- function(x, store = "session", path = "file", format = NULL,
       temp_names <- basename(temp_names)
       names(temp_res) <- temp_names
     } else {
-      temp_res <- read_session(res$fmt, res$data, res$path)
+      temp_res <- read_session(res$fmt, res$data, res$path, ...)
     }
     unlink(res$temp_files)
     temp_res
@@ -119,15 +148,15 @@ ckan_fetch <- function(x, store = "session", path = "file", format = NULL,
   }
 }
 
-read_session <- function(fmt, dat, path) {
+read_session <- function(fmt, dat, path, ...) {
   switch(fmt,
          csv = {
            if (!is.null(dat)) {
              read.csv(text = dat, stringsAsFactors = FALSE,
-              fileEncoding = "latin1")
+              fileEncoding = "latin1", ...)
            } else {
              read.csv(path, stringsAsFactors = FALSE,
-              fileEncoding = "latin1")
+              fileEncoding = "latin1", ...)
            }
          },
          xls = {
@@ -140,31 +169,40 @@ read_session <- function(fmt, dat, path) {
          },
          xml = {
            check4X("xml2")
-           xml2::read_xml(dat)
+           xml2::read_xml(dat, ...)
          },
          html = {
            check4X("xml2")
-           xml2::read_html(dat)
+           xml2::read_html(dat, ...)
          },
-         json = jsonlite::fromJSON(dat),
+         json = jsonlite::fromJSON(dat, ...),
          shp = {
            check4X("sf")
-           sf::st_read(path)
+           sf::st_read(path, ...)
          },
          geojson = {
            check4X("sf")
-           sf::st_read(path)
+           sf::st_read(path, ...)
+         },
+         txt = {
+           txt_res <- try(read.table(path, ...), silent = TRUE)
+           
+           if (inherits(txt_res, "try-error")) {
+             stop("File cannot be read via `read.table()`. Please download and import into R manually.", call. = FALSE)
+           } else {
+             txt_res
+           }
          }
   )
 }
 
-read_all_excel_sheets <- function(x) {
+read_all_excel_sheets <- function(x, ...) {
   sheets <- readxl::excel_sheets(x)
   if (length(sheets) > 1) {
-    res <- lapply(sheets, readxl::read_excel, path = x)
+    res <- lapply(sheets, readxl::read_excel, path = x, ...)
     names(res) <- sheets
     res
   } else {
-    readxl::read_excel(x)
+    readxl::read_excel(x, ...)
   }
 }
